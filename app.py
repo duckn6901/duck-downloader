@@ -49,7 +49,7 @@ def get_yt_dlp_options():
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'mweb', 'web']
+                'player_client': ['android', 'web']
             }
         }
     }
@@ -169,6 +169,27 @@ def get_video_info():
         error_msg = str(e)
         if 'Unsupported URL' in error_msg:
             return jsonify({'error': 'Liên kết không được hỗ trợ. Vui lòng kiểm tra lại URL.'}), 400
+        elif 'Sign in to confirm' in error_msg:
+            # Re-try with android client fallback
+            try:
+                fallback_opts = get_yt_dlp_options()
+                fallback_opts['extractor_args'] = {'youtube': {'player_client': ['android']}}
+                with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    return jsonify({
+                        'success': True,
+                        'title': info.get('title', 'Video Download'),
+                        'thumbnail': info.get('thumbnail', ''),
+                        'duration': 'N/A',
+                        'uploader': info.get('uploader', 'YouTube'),
+                        'platform': 'YouTube',
+                        'qualities': [
+                            {'id': '720p', 'label': 'Video 720p / HD', 'type': 'video'},
+                            {'id': 'mp3', 'label': 'Audio / Âm thanh MP3', 'type': 'audio'}
+                        ]
+                    })
+            except Exception:
+                pass
         return jsonify({'error': f'Lỗi lấy thông tin video: {error_msg}'}), 500
 
 @app.route('/api/download', methods=['GET'])
@@ -200,12 +221,15 @@ def download_video():
                 with urllib.request.urlopen(req, timeout=30) as response, open(local_filename, 'wb') as out_file:
                     shutil.copyfileobj(response, out_file)
                 
-                return send_file(
+                resp = send_file(
                     local_filename,
                     as_attachment=True,
                     download_name=f"DuckDownloader_{clean_title}.{ext}",
                     mimetype='application/octet-stream'
                 )
+                resp.headers["Content-Type"] = "application/octet-stream"
+                resp.headers["Content-Disposition"] = f'attachment; filename="DuckDownloader_{clean_title}.{ext}"'
+                return resp
             except Exception as e:
                 print("Direct TikTok download failed, falling back to yt-dlp:", str(e))
 
@@ -266,12 +290,15 @@ def download_video():
             download_name = os.path.basename(filename)
             clean_download_name = re.sub(r'^media_\d+_', '', download_name)
 
-            return send_file(
+            resp = send_file(
                 filename,
                 as_attachment=True,
                 download_name=clean_download_name,
                 mimetype='application/octet-stream'
             )
+            resp.headers["Content-Type"] = "application/octet-stream"
+            resp.headers["Content-Disposition"] = f'attachment; filename="{clean_download_name}"'
+            return resp
 
     except Exception as e:
         return jsonify({'error': f'Lỗi tải xuống: {str(e)}'}), 500
