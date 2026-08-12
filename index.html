@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuckDownloader - Tải Video YouTube, TikTok Không Logo, Facebook HD</title>
+    <title>DuckDownloader - Tải Video Không Logo & Chuyển Đổi PDF sang PNG</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PDF.js, JSZip & FileSaver CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -25,88 +31,151 @@
                 <i class="fa-solid fa-feather-pointed logo-icon"></i>
                 <span>Duck<span class="highlight">Downloader</span></span>
             </div>
-            <p class="subtitle">Tải video TikTok Không Watermark, YouTube & Facebook chất lượng cao (360p - 1080p - MP3)</p>
+            <p class="subtitle">Công cụ trực tuyến: Tải video TikTok, Facebook Không Logo & Chuyển đổi PDF sang PNG sắc nét</p>
         </header>
+
+        <!-- Top Navigation Bar (Tabs) -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('videoTab')">
+                <i class="fa-solid fa-video"></i> <span>Tải Video Không Logo</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('convertTab')">
+                <i class="fa-solid fa-arrows-rotate"></i> <span>Chuyển Đổi File (PDF → PNG)</span>
+            </button>
+        </nav>
 
         <!-- In-App Browser Warning (Zalo / Facebook webview) -->
         <div id="inAppNotice" class="in-app-notice hidden">
             <i class="fa-solid fa-compass"></i>
-            <span>Bạn đang mở trên Zalo/Facebook. Vui lòng bấm dấu <strong>(...)</strong> ở góc trên $\rightarrow$ chọn <strong>Mở bằng Safari / Chrome</strong> để tải file về máy.</span>
+            <span>Bạn đang mở trên Zalo/Facebook. Vui lòng bấm <strong>(...)</strong> ở góc trên → chọn <strong>Mở bằng Safari / Chrome</strong> để tải file về máy.</span>
         </div>
 
-        <!-- Platform Badges -->
-        <div class="platform-badges">
-            <span class="badge tiktok"><i class="fa-brands fa-tiktok"></i> TikTok (No Logo)</span>
-            <span class="badge youtube"><i class="fa-brands fa-youtube"></i> YouTube</span>
-            <span class="badge facebook"><i class="fa-brands fa-facebook"></i> Facebook</span>
-            <span class="badge instagram"><i class="fa-brands fa-instagram"></i> Instagram</span>
-        </div>
+        <!-- ================= TAB 1: TẢI VIDEO KHÔNG LOGO ================= -->
+        <div id="videoTab" class="tab-content active">
+            <!-- Platform Badges (YouTube Removed) -->
+            <div class="platform-badges">
+                <span class="badge tiktok"><i class="fa-brands fa-tiktok"></i> TikTok (No Logo)</span>
+                <span class="badge facebook"><i class="fa-brands fa-facebook"></i> Facebook HD</span>
+                <span class="badge instagram"><i class="fa-brands fa-instagram"></i> Instagram</span>
+            </div>
 
-        <!-- Main Search Form -->
-        <div class="card search-card">
-            <form id="downloadForm" onsubmit="handleFetchInfo(event)">
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-link input-icon"></i>
-                    <input type="url" id="videoUrl" placeholder="Dán liên kết video (TikTok, YouTube, Facebook...)" required autocomplete="off">
-                    <div class="input-actions">
-                        <button type="button" class="btn-paste" onclick="handlePasteLink()" title="Dán từ Clipboard">
-                            <i class="fa-solid fa-paste"></i> <span>Dán</span>
-                        </button>
-                        <button type="submit" id="btnSubmit" class="btn-submit">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <span>Phân tích</span>
-                        </button>
-                    </div>
-                </div>
-            </form>
-            <div id="errorMessage" class="error-banner hidden"></div>
-        </div>
-
-        <!-- Loader Skeleton -->
-        <div id="loader" class="card loader-card hidden">
-            <div class="spinner"></div>
-            <p>Đang phân tích liên kết & lấy danh sách chất lượng...</p>
-        </div>
-
-        <!-- Result Card -->
-        <div id="resultCard" class="card result-card hidden">
-            <div class="result-layout">
-                <div class="thumbnail-wrapper">
-                    <img id="videoThumbnail" src="" alt="Thumbnail Video">
-                    <span id="videoDuration" class="duration-badge">00:00</span>
-                </div>
-                <div class="video-details">
-                    <div class="platform-tag" id="platformTag"><i class="fa-solid fa-play"></i> TikTok</div>
-                    <h2 id="videoTitle" class="video-title">Tiêu đề video...</h2>
-                    <p class="uploader-info"><i class="fa-solid fa-user-circle"></i> Tác giả: <span id="videoUploader">--</span></p>
-
-                    <!-- Quality Options -->
-                    <div class="quality-section">
-                        <label for="qualitySelect"><i class="fa-solid fa-sliders"></i> Chọn chất lượng tải xuống:</label>
-                        <div class="custom-select-wrapper">
-                            <select id="qualitySelect" class="quality-select" onchange="updateDownloadLink()">
-                                <option value="720p" selected>📺 Video 720p (HD sắc nét)</option>
-                                <option value="1080p">🎬 Video 1080p (Full HD)</option>
-                                <option value="360p">📱 Video 360p (Tiết kiệm dung lượng)</option>
-                                <option value="mp3">🎵 Audio MP3 (Tách nhạc/âm thanh)</option>
-                            </select>
-                            <i class="fa-solid fa-chevron-down select-arrow"></i>
+            <!-- Main Search Form -->
+            <div class="card search-card">
+                <form id="downloadForm" onsubmit="handleFetchInfo(event)">
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-link input-icon"></i>
+                        <input type="url" id="videoUrl" placeholder="Dán liên kết video (TikTok, Facebook, Instagram...)" required autocomplete="off">
+                        <div class="input-actions">
+                            <button type="button" class="btn-paste" onclick="handlePasteLink()" title="Dán từ Clipboard">
+                                <i class="fa-solid fa-paste"></i> <span>Dán</span>
+                            </button>
+                            <button type="submit" id="btnSubmit" class="btn-submit">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <span>Phân tích</span>
+                            </button>
                         </div>
                     </div>
+                </form>
+                <div id="errorMessage" class="error-banner hidden"></div>
+            </div>
 
-                    <!-- Direct Download Link Element (Snaptik style) -->
-                    <div class="action-buttons">
-                        <a id="btnDownload" class="btn-download" href="#" target="_self" download="DuckDownloader_Video.mp4" onclick="handleDownloadClick(event)">
-                            <i class="fa-solid fa-download"></i> <span>Tải MP4 (Không Logo)</span>
-                        </a>
+            <!-- Loader Skeleton -->
+            <div id="loader" class="card loader-card hidden">
+                <div class="spinner"></div>
+                <p>Đang phân tích liên kết & lấy danh sách chất lượng...</p>
+            </div>
+
+            <!-- Result Card -->
+            <div id="resultCard" class="card result-card hidden">
+                <div class="result-layout">
+                    <div class="thumbnail-wrapper">
+                        <img id="videoThumbnail" src="" alt="Thumbnail Video">
+                        <span id="videoDuration" class="duration-badge">00:00</span>
+                    </div>
+                    <div class="video-details">
+                        <div class="platform-tag" id="platformTag"><i class="fa-solid fa-play"></i> TikTok</div>
+                        <h2 id="videoTitle" class="video-title">Tiêu đề video...</h2>
+                        <p class="uploader-info"><i class="fa-solid fa-user-circle"></i> Tác giả: <span id="videoUploader">--</span></p>
+
+                        <!-- Quality Options -->
+                        <div class="quality-section">
+                            <label for="qualitySelect"><i class="fa-solid fa-sliders"></i> Chọn chất lượng tải xuống:</label>
+                            <div class="custom-select-wrapper">
+                                <select id="qualitySelect" class="quality-select" onchange="updateDownloadLink()">
+                                    <option value="720p" selected>📺 Video 720p (HD sắc nét)</option>
+                                    <option value="1080p">🎬 Video 1080p (Full HD)</option>
+                                    <option value="360p">📱 Video 360p (Tiết kiệm dung lượng)</option>
+                                    <option value="mp3">🎵 Audio MP3 (Tách nhạc/âm thanh)</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down select-arrow"></i>
+                            </div>
+                        </div>
+
+                        <!-- Direct Download Link Element -->
+                        <div class="action-buttons">
+                            <a id="btnDownload" class="btn-download" href="#" target="_self" download="DuckDownloader_Video.mp4" onclick="handleDownloadClick(event)">
+                                <i class="fa-solid fa-download"></i> <span>Tải MP4 (Không Logo)</span>
+                            </a>
+                        </div>
+
+                        <!-- Download Progress -->
+                        <div id="downloadProgress" class="progress-box hidden">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill"></div>
+                            </div>
+                            <p class="progress-status"><i class="fa-solid fa-spinner fa-spin"></i> Đang khởi tạo bản tải về trên thiết bị...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: CHUYỂN ĐỔI FILE (PDF SANG PNG) ================= -->
+        <div id="convertTab" class="tab-content">
+            <div class="card converter-card">
+                <div class="converter-header">
+                    <h2><i class="fa-solid fa-file-pdf"></i> Chuyển đổi PDF sang PNG (Chất lượng cao)</h2>
+                    <p>Chuyển đổi từng trang file PDF thành hình ảnh PNG sắc nét nguyên bản 300 DPI.</p>
+                </div>
+
+                <!-- Dropzone Box (Smallpdf Style in Harmonious Dark Theme) -->
+                <div id="pdfDropzone" class="pdf-dropzone" onclick="document.getElementById('pdfFileInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleFileDrop(event)">
+                    <input type="file" id="pdfFileInput" accept="application/pdf" class="hidden" onchange="handlePdfSelected(event)">
+                    <div class="dropzone-content">
+                        <div class="pdf-icon-wrapper">
+                            <i class="fa-solid fa-file-pdf pdf-main-icon"></i>
+                        </div>
+                        <button type="button" class="btn-select-pdf">
+                            <i class="fa-solid fa-folder-open"></i> <span>CHỌN CÁC TỆP PDF</span>
+                        </button>
+                        <p class="dropzone-text">hoặc kéo thả tệp PDF vào đây</p>
+                    </div>
+                </div>
+
+                <!-- PDF Conversion Loader -->
+                <div id="pdfLoader" class="converter-loader hidden">
+                    <div class="spinner"></div>
+                    <p id="pdfStatusText">Đang đọc file PDF và xuất hình ảnh PNG chất lượng cao...</p>
+                </div>
+
+                <!-- PDF Conversion Results Section -->
+                <div id="pdfResults" class="pdf-results-section hidden">
+                    <div class="pdf-summary-bar">
+                        <div class="pdf-file-info">
+                            <i class="fa-solid fa-file-circle-check"></i>
+                            <div>
+                                <h3 id="pdfFileName">tai_lieu.pdf</h3>
+                                <p id="pdfPageCount">Tổng số: 0 trang ảnh</p>
+                            </div>
+                        </div>
+                        <button id="btnDownloadZip" class="btn-download-zip" onclick="downloadAllPagesAsZip()">
+                            <i class="fa-solid fa-file-zipper"></i> <span>Tải Tất Cả (File ZIP)</span>
+                        </button>
                     </div>
 
-                    <!-- Download Progress -->
-                    <div id="downloadProgress" class="progress-box hidden">
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill"></div>
-                        </div>
-                        <p class="progress-status"><i class="fa-solid fa-spinner fa-spin"></i> Đang khởi tạo bản tải về trên thiết bị...</p>
+                    <!-- Images Grid -->
+                    <div id="pdfPagesGrid" class="pdf-pages-grid">
+                        <!-- Rendered PDF pages will appear here -->
                     </div>
                 </div>
             </div>
@@ -120,9 +189,9 @@
                 <p>Tự động bóc tách và xóa sạch logo TikTok, cho ra video nguyên bản chất lượng nhất.</p>
             </div>
             <div class="feature-item">
-                <div class="feature-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-                <h3>Tùy Chọn Chất Lượng</h3>
-                <p>Hỗ trợ đa dạng các định dạng từ 360p, 720p HD, 1080p Full HD đến file nhạc MP3.</p>
+                <div class="feature-icon"><i class="fa-solid fa-file-image"></i></div>
+                <h3>PDF Sang PNG Sắc Nét</h3>
+                <p>Xuất hình ảnh PNG độ phân giải 300 DPI giữ nguyên độ chi tiết văn bản và màu sắc.</p>
             </div>
             <div class="feature-item">
                 <div class="feature-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
