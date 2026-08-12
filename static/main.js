@@ -60,6 +60,19 @@ async function handleFetchInfo(event) {
         const platformTag = document.getElementById('platformTag');
         platformTag.innerHTML = `<i class="fa-solid fa-play"></i> ${data.platform}`;
 
+        // Populate Quality Select
+        const qualitySelect = document.getElementById('qualitySelect');
+        if (data.qualities && data.qualities.length > 0) {
+            qualitySelect.innerHTML = '';
+            data.qualities.forEach((q, idx) => {
+                const opt = document.createElement('option');
+                opt.value = q.id;
+                opt.textContent = q.label;
+                if (idx === 0) opt.selected = true;
+                qualitySelect.appendChild(opt);
+            });
+        }
+
         // Show result card
         loader.classList.add('hidden');
         resultCard.classList.remove('hidden');
@@ -73,7 +86,7 @@ async function handleFetchInfo(event) {
     }
 }
 
-// Start download
+// Start download - Mobile friendly trigger
 function startDownload() {
     if (!currentVideoUrl) return;
 
@@ -86,18 +99,13 @@ function startDownload() {
     // Build API endpoint URL
     const downloadApiUrl = `/api/download?url=${encodeURIComponent(currentVideoUrl)}&quality=${encodeURIComponent(selectedQuality)}`;
 
-    // Create a hidden anchor element to trigger file download
-    const hiddenAnchor = document.createElement('a');
-    hiddenAnchor.href = downloadApiUrl;
-    hiddenAnchor.target = '_blank';
-    document.body.appendChild(hiddenAnchor);
-    hiddenAnchor.click();
-    document.body.removeChild(hiddenAnchor);
+    // Triggers native browser download popup on iOS Safari, Android Chrome, and Desktop
+    window.location.href = downloadApiUrl;
 
     // Hide progress indicator after delay
     setTimeout(() => {
         downloadProgress.classList.add('hidden');
-    }, 6000);
+    }, 5000);
 }
 
 function showError(msg) {

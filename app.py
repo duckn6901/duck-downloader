@@ -5,7 +5,8 @@ import time
 import re
 import json
 import shutil
-import threading
+import urllib.request
+import urllib.parse
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from flask_cors import CORS
 import yt_dlp
@@ -19,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(BASE_DIR, 'downloads')
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Check ffmpeg availability
+# Helper: Check ffmpeg availability
 def get_ffmpeg_path():
     system_ffmpeg = shutil.which('ffmpeg')
     if system_ffmpeg:
@@ -29,7 +30,7 @@ def get_ffmpeg_path():
         return local_ffmpeg
     return None
 
-# Helper to clean up old downloads (> 1 hour old)
+# Helper: Clean up old downloads (> 1 hour old)
 def cleanup_old_downloads():
     now = time.time()
     for filename in os.listdir(DOWNLOAD_DIR):
@@ -45,12 +46,51 @@ def get_yt_dlp_options():
     opts = {
         'quiet': True,
         'no_warnings': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'mweb', 'web']
+            }
+        }
     }
     ffmpeg_p = get_ffmpeg_path()
     if ffmpeg_p:
         opts['ffmpeg_location'] = ffmpeg_p
     return opts
+
+# Smart TikTok Extractor (TikWM API)
+def fetch_tiktok_info(tiktok_url):
+    try:
+        api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(tiktok_url)}"
+        req = urllib.request.Request(api_url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+        resp = urllib.request.urlopen(req, timeout=10)
+        res = json.loads(resp.read().decode('utf-8'))
+        if res.get('code') == 0:
+            d = res.get('data', {})
+            duration_sec = d.get('duration', 0)
+            mins, secs = divmod(int(duration_sec), 60)
+            hrs, mins = divmod(mins, 60)
+            duration_str = f"{hrs:02d}:{mins:02d}:{secs:02d}" if hrs else f"{mins:02d}:{secs:02d}"
+            
+            return {
+                'success': True,
+                'title': d.get('title') or 'TikTok Video',
+                'uploader': d.get('author', {}).get('nickname') or d.get('author', {}).get('unique_id') or 'TikTok Creator',
+                'thumbnail': d.get('cover'),
+                'duration': duration_str,
+                'platform': 'TikTok',
+                'video_url': d.get('play') or d.get('wmplay'),
+                'audio_url': d.get('music'),
+                'qualities': [
+                    {'id': '720p', 'label': 'Video TikTok (Không Logo / Watermark)', 'type': 'video'},
+                    {'id': 'mp3', 'label': 'Audio TikTok MP3 (Nhạc gốc)', 'type': 'audio'}
+                ]
+            }
+    except Exception as e:
+        print("TikTok API Error:", str(e))
+    return None
 
 @app.route('/')
 def index():
@@ -64,6 +104,13 @@ def get_video_info():
     if not url:
         return jsonify({'error': 'Vui lòng nhập liên kết video!'}), 400
 
+    # 1. If TikTok URL, try TikWM API first
+    if 'tiktok.com' in url.lower() or 'vt.tiktok' in url.lower() or 'vm.tiktok' in url.lower():
+        tiktok_res = fetch_tiktok_info(url)
+        if tiktok_res:
+            return jsonify(tiktok_res)
+
+    # 2. Use yt-dlp for YouTube, Facebook, Instagram, or TikTok fallback
     ydl_opts = get_yt_dlp_options()
     ydl_opts['extract_flat'] = False
 
@@ -93,7 +140,6 @@ def get_video_info():
             else:
                 duration_str = "N/A"
 
-            # Available qualities
             qualities = [
                 {'id': '720p', 'label': 'Video 720p / HD', 'type': 'video'},
                 {'id': '1080p', 'label': 'Video 1080p / Full HD', 'type': 'video'},
@@ -102,7 +148,6 @@ def get_video_info():
             ]
 
             thumbnail = info.get('thumbnail') or (info.get('thumbnails', [{}])[-1].get('url') if info.get('thumbnails') else '')
-            has_ffmpeg = get_ffmpeg_path() is not None
 
             return jsonify({
                 'success': True,
@@ -111,11 +156,16 @@ def get_video_info():
                 'duration': duration_str,
                 'uploader': info.get('uploader') or info.get('uploader_id') or 'Tác giả',
                 'platform': platform,
-                'has_ffmpeg': has_ffmpeg,
                 'qualities': qualities
             })
 
     except Exception as e:
+        # Fallback to TikWM if yt-dlp failed on TikTok
+        if 'tiktok.com' in url.lower() or 'vt.tiktok' in url.lower():
+            tiktok_res = fetch_tiktok_info(url)
+            if tiktok_res:
+                return jsonify(tiktok_res)
+
         error_msg = str(e)
         if 'Unsupported URL' in error_msg:
             return jsonify({'error': 'Liên kết không được hỗ trợ. Vui lòng kiểm tra lại URL.'}), 400
@@ -130,8 +180,36 @@ def download_video():
         return jsonify({'error': 'Thiếu liên kết URL'}), 400
 
     cleanup_old_downloads()
-
     timestamp = int(time.time() * 1000)
+
+    # TikTok direct stream handling
+    if 'tiktok.com' in url.lower() or 'vt.tiktok' in url.lower() or 'vm.tiktok' in url.lower():
+        tiktok_res = fetch_tiktok_info(url)
+        if tiktok_res:
+            target_media_url = tiktok_res['audio_url'] if quality == 'mp3' else tiktok_res['video_url']
+            ext = 'mp3' if quality == 'mp3' else 'mp4'
+            
+            clean_title = re.sub(r'[^\w\s-]', '', tiktok_res['title']).strip() or 'TikTok_Video'
+            clean_title = clean_title.replace(' ', '_')[:40]
+            local_filename = os.path.join(DOWNLOAD_DIR, f'media_{timestamp}_{clean_title}.{ext}')
+
+            try:
+                req = urllib.request.Request(target_media_url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                })
+                with urllib.request.urlopen(req, timeout=30) as response, open(local_filename, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+                
+                return send_file(
+                    local_filename,
+                    as_attachment=True,
+                    download_name=f"DuckDownloader_{clean_title}.{ext}",
+                    mimetype='application/octet-stream'
+                )
+            except Exception as e:
+                print("Direct TikTok download failed, falling back to yt-dlp:", str(e))
+
+    # Standard yt-dlp download pipeline
     out_tmpl = os.path.join(DOWNLOAD_DIR, f'media_{timestamp}_%(id)s.%(ext)s')
 
     ydl_opts = get_yt_dlp_options()
@@ -141,7 +219,6 @@ def download_video():
     has_ffmpeg = get_ffmpeg_path() is not None
 
     if has_ffmpeg:
-        # Merging allowed with ffmpeg
         if quality == 'mp3':
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
@@ -158,7 +235,6 @@ def download_video():
         else:
             ydl_opts['format'] = 'best'
     else:
-        # Robust Fallback without ffmpeg: ONLY progressive single-file formats (NO '+' merging)
         if quality == 'mp3':
             ydl_opts['format'] = 'bestaudio/best'
         elif quality == '360p':
@@ -175,13 +251,11 @@ def download_video():
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-            # If MP3 conversion replaced extension
             if quality == 'mp3' and has_ffmpeg:
                 base, _ = os.path.splitext(filename)
                 if os.path.exists(base + '.mp3'):
                     filename = base + '.mp3'
 
-            # Search for actual created file if path matches pattern
             if not os.path.exists(filename):
                 matching_files = glob.glob(os.path.join(DOWNLOAD_DIR, f'media_{timestamp}_*'))
                 if matching_files:
@@ -190,13 +264,13 @@ def download_video():
                     return jsonify({'error': 'Không tìm thấy file sau khi tải về.'}), 500
 
             download_name = os.path.basename(filename)
-            # Remove timestamp prefix from download filename
             clean_download_name = re.sub(r'^media_\d+_', '', download_name)
 
             return send_file(
                 filename,
                 as_attachment=True,
-                download_name=clean_download_name
+                download_name=clean_download_name,
+                mimetype='application/octet-stream'
             )
 
     except Exception as e:
