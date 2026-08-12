@@ -100,6 +100,11 @@ def fetch_tiktok_info(tiktok_url):
 def index():
     return render_template('index.html')
 
+@app.route('/favicon.ico')
+@app.route('/favicon.svg')
+def favicon():
+    return send_file(os.path.join(BASE_DIR, 'static', 'favicon.svg'), mimetype='image/svg+xml')
+
 @app.route('/api/info', methods=['POST'])
 def get_video_info():
     data = request.get_json() or {}
