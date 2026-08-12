@@ -120,6 +120,19 @@ body {
     margin: 0 auto;
 }
 
+.in-app-notice {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #FCD34D;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    line-height: 1.4;
+}
+
 /* Platform Badges */
 .platform-badges {
     display: flex;
@@ -384,10 +397,12 @@ body {
     color: var(--text-muted);
 }
 
+/* Direct <a> tag download button (Snaptik style) */
 .btn-download {
     width: 100%;
     background: linear-gradient(135deg, #10B981, #059669);
-    color: #FFF;
+    color: #FFF !important;
+    text-decoration: none !important;
     border: none;
     padding: 14px;
     border-radius: var(--radius-md);

@@ -1,5 +1,15 @@
 let currentVideoUrl = '';
 
+// Check in-app browser (Zalo / Facebook / Messenger / Instagram)
+document.addEventListener('DOMContentLoaded', () => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isInApp = /Zalo|FBAN|FBAV|Instagram|Messenger/i.test(ua);
+    if (isInApp) {
+        const notice = document.getElementById('inAppNotice');
+        if (notice) notice.classList.remove('hidden');
+    }
+});
+
 // Paste link from clipboard
 async function handlePasteLink() {
     try {
@@ -9,6 +19,34 @@ async function handlePasteLink() {
         }
     } catch (err) {
         console.log('Clipboard paste not allowed or empty:', err);
+    }
+}
+
+// Update the direct <a> href link dynamically
+function updateDownloadLink() {
+    if (!currentVideoUrl) return;
+
+    const qualitySelect = document.getElementById('qualitySelect');
+    const selectedQuality = qualitySelect ? qualitySelect.value : '720p';
+    const btnDownload = document.getElementById('btnDownload');
+
+    const downloadApiUrl = `/api/download?url=${encodeURIComponent(currentVideoUrl)}&quality=${encodeURIComponent(selectedQuality)}`;
+    const ext = selectedQuality === 'mp3' ? 'mp3' : 'mp4';
+
+    btnDownload.href = downloadApiUrl;
+    btnDownload.setAttribute('download', `DuckDownloader_Video.${ext}`);
+
+    const labelSpan = btnDownload.querySelector('span');
+    if (labelSpan) {
+        if (selectedQuality === 'mp3') {
+            labelSpan.textContent = 'Tải MP3 (Âm Thanh)';
+        } else if (selectedQuality === '1080p') {
+            labelSpan.textContent = 'Tải MP4 (Full HD 1080p)';
+        } else if (selectedQuality === '360p') {
+            labelSpan.textContent = 'Tải MP4 (360p SD)';
+        } else {
+            labelSpan.textContent = 'Tải MP4 (Không Logo / HD)';
+        }
     }
 }
 
@@ -73,6 +111,9 @@ async function handleFetchInfo(event) {
             });
         }
 
+        // Update the direct download <a> href link
+        updateDownloadLink();
+
         // Show result card
         loader.classList.add('hidden');
         resultCard.classList.remove('hidden');
@@ -86,26 +127,15 @@ async function handleFetchInfo(event) {
     }
 }
 
-// Start download - Mobile friendly trigger
-function startDownload() {
-    if (!currentVideoUrl) return;
-
-    const qualitySelect = document.getElementById('qualitySelect');
-    const selectedQuality = qualitySelect.value;
+// Handle Download Click Animation
+function handleDownloadClick(event) {
     const downloadProgress = document.getElementById('downloadProgress');
-
-    downloadProgress.classList.remove('hidden');
-
-    // Build API endpoint URL
-    const downloadApiUrl = `/api/download?url=${encodeURIComponent(currentVideoUrl)}&quality=${encodeURIComponent(selectedQuality)}`;
-
-    // Triggers native browser download popup on iOS Safari, Android Chrome, and Desktop
-    window.location.href = downloadApiUrl;
-
-    // Hide progress indicator after delay
-    setTimeout(() => {
-        downloadProgress.classList.add('hidden');
-    }, 5000);
+    if (downloadProgress) {
+        downloadProgress.classList.remove('hidden');
+        setTimeout(() => {
+            downloadProgress.classList.add('hidden');
+        }, 6000);
+    }
 }
 
 function showError(msg) {

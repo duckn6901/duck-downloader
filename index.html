@@ -28,6 +28,12 @@
             <p class="subtitle">Tải video TikTok Không Watermark, YouTube & Facebook chất lượng cao (360p - 1080p - MP3)</p>
         </header>
 
+        <!-- In-App Browser Warning (Zalo / Facebook webview) -->
+        <div id="inAppNotice" class="in-app-notice hidden">
+            <i class="fa-solid fa-compass"></i>
+            <span>Bạn đang mở trên Zalo/Facebook. Vui lòng bấm dấu <strong>(...)</strong> ở góc trên $\rightarrow$ chọn <strong>Mở bằng Safari / Chrome</strong> để tải file về máy.</span>
+        </div>
+
         <!-- Platform Badges -->
         <div class="platform-badges">
             <span class="badge tiktok"><i class="fa-brands fa-tiktok"></i> TikTok (No Logo)</span>
@@ -78,7 +84,7 @@
                     <div class="quality-section">
                         <label for="qualitySelect"><i class="fa-solid fa-sliders"></i> Chọn chất lượng tải xuống:</label>
                         <div class="custom-select-wrapper">
-                            <select id="qualitySelect" class="quality-select">
+                            <select id="qualitySelect" class="quality-select" onchange="updateDownloadLink()">
                                 <option value="720p" selected>📺 Video 720p (HD sắc nét)</option>
                                 <option value="1080p">🎬 Video 1080p (Full HD)</option>
                                 <option value="360p">📱 Video 360p (Tiết kiệm dung lượng)</option>
@@ -88,22 +94,19 @@
                         </div>
                     </div>
 
-                    <!-- Action Buttons -->
+                    <!-- Direct Download Link Element (Snaptik style) -->
                     <div class="action-buttons">
-                        <button id="btnDownload" class="btn-download" onclick="startDownload()">
-                            <i class="fa-solid fa-download"></i> <span>Tải Video Ngay</span>
-                        </button>
+                        <a id="btnDownload" class="btn-download" href="#" target="_self" download="DuckDownloader_Video.mp4" onclick="handleDownloadClick(event)">
+                            <i class="fa-solid fa-download"></i> <span>Tải MP4 (Không Logo)</span>
+                        </a>
                     </div>
-
-                    <!-- Mobile Tip -->
-                    <p class="mobile-tip"><i class="fa-solid fa-circle-info"></i> <strong>Mẹo lưu vào Album (iPhone/Android):</strong> Khi bấm Tải Video Ngay, nếu trình duyệt phát video, hãy bấm nút <strong>Chia sẻ (Share)</strong> $\rightarrow$ chọn <strong>Lưu Video (Save Video)</strong> để lưu thẳng vào Thư viện Ảnh.</p>
 
                     <!-- Download Progress -->
                     <div id="downloadProgress" class="progress-box hidden">
                         <div class="progress-bar-bg">
                             <div class="progress-bar-fill"></div>
                         </div>
-                        <p class="progress-status"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải file về thiết bị, vui lòng chờ trong giây lát...</p>
+                        <p class="progress-status"><i class="fa-solid fa-spinner fa-spin"></i> Đang khởi tạo bản tải về trên thiết bị...</p>
                     </div>
                 </div>
             </div>
