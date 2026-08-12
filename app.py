@@ -7,16 +7,20 @@ import json
 import shutil
 import urllib.request
 import urllib.parse
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
 import yt_dlp
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    static_folder=os.path.join(BASE_DIR, 'static'),
+    template_folder=os.path.join(BASE_DIR, 'templates')
+)
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(BASE_DIR, 'downloads')
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -118,7 +122,6 @@ def get_video_info():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            # Identify platform
             extractor = info.get('extractor_key', '').lower()
             if 'tiktok' in extractor:
                 platform = 'TikTok'
@@ -131,7 +134,6 @@ def get_video_info():
             else:
                 platform = info.get('extractor', 'Video')
 
-            # Duration formatting
             duration = info.get('duration')
             if duration:
                 mins, secs = divmod(int(duration), 60)
@@ -160,7 +162,6 @@ def get_video_info():
             })
 
     except Exception as e:
-        # Fallback to TikWM if yt-dlp failed on TikTok
         if 'tiktok.com' in url.lower() or 'vt.tiktok' in url.lower():
             tiktok_res = fetch_tiktok_info(url)
             if tiktok_res:
@@ -170,7 +171,6 @@ def get_video_info():
         if 'Unsupported URL' in error_msg:
             return jsonify({'error': 'Liên kết không được hỗ trợ. Vui lòng kiểm tra lại URL.'}), 400
         elif 'Sign in to confirm' in error_msg:
-            # Re-try with android client fallback
             try:
                 fallback_opts = get_yt_dlp_options()
                 fallback_opts['extractor_args'] = {'youtube': {'player_client': ['android']}}
@@ -203,37 +203,37 @@ def download_video():
     cleanup_old_downloads()
     timestamp = int(time.time() * 1000)
 
-    # TikTok direct stream handling
+    # 1. TikTok Instant Stream (Zero Disk Lag)
     if 'tiktok.com' in url.lower() or 'vt.tiktok' in url.lower() or 'vm.tiktok' in url.lower():
         tiktok_res = fetch_tiktok_info(url)
         if tiktok_res:
             target_media_url = tiktok_res['audio_url'] if quality == 'mp3' else tiktok_res['video_url']
             ext = 'mp3' if quality == 'mp3' else 'mp4'
-            
             clean_title = re.sub(r'[^\w\s-]', '', tiktok_res['title']).strip() or 'TikTok_Video'
-            clean_title = clean_title.replace(' ', '_')[:40]
-            local_filename = os.path.join(DOWNLOAD_DIR, f'media_{timestamp}_{clean_title}.{ext}')
+            clean_title = clean_title.replace(' ', '_')[:35]
+            download_filename = f"DuckDownloader_{clean_title}.{ext}"
 
-            try:
+            def generate_stream():
                 req = urllib.request.Request(target_media_url, headers={
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 })
-                with urllib.request.urlopen(req, timeout=30) as response, open(local_filename, 'wb') as out_file:
-                    shutil.copyfileobj(response, out_file)
-                
-                resp = send_file(
-                    local_filename,
-                    as_attachment=True,
-                    download_name=f"DuckDownloader_{clean_title}.{ext}",
-                    mimetype='application/octet-stream'
-                )
-                resp.headers["Content-Type"] = "application/octet-stream"
-                resp.headers["Content-Disposition"] = f'attachment; filename="DuckDownloader_{clean_title}.{ext}"'
-                return resp
-            except Exception as e:
-                print("Direct TikTok download failed, falling back to yt-dlp:", str(e))
+                with urllib.request.urlopen(req, timeout=30) as res:
+                    while True:
+                        chunk = res.read(64 * 1024)
+                        if not chunk:
+                            break
+                        yield chunk
 
-    # Standard yt-dlp download pipeline
+            return Response(
+                stream_with_context(generate_stream()),
+                mimetype='application/octet-stream',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{download_filename}"',
+                    'Content-Type': 'application/octet-stream'
+                }
+            )
+
+    # 2. Standard yt-dlp download pipeline for YouTube / Facebook
     out_tmpl = os.path.join(DOWNLOAD_DIR, f'media_{timestamp}_%(id)s.%(ext)s')
 
     ydl_opts = get_yt_dlp_options()
