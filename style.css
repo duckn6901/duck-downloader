@@ -106,6 +106,17 @@ body {
     filter: drop-shadow(0 0 12px var(--primary-glow));
 }
 
+.logo-img {
+    width: 48px;
+    height: 48px;
+    filter: drop-shadow(0 0 10px var(--primary-glow));
+    transition: transform 0.3s ease;
+}
+
+.logo-img:hover {
+    transform: rotate(-8deg) scale(1.1);
+}
+
 .highlight {
     background: linear-gradient(135deg, var(--primary), #FF7A00);
     -webkit-background-clip: text;

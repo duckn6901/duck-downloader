@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+    <!-- Gentle Water Waves -->
+    <path d="M4 46 C12 42, 20 50, 28 46 C36 42, 44 50, 52 46 C56 44, 60 46, 60 46" fill="none" stroke="#06B6D4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M8 53 C16 49, 24 57, 32 53 C40 49, 48 57, 56 53" fill="none" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Duck Body -->
+    <path d="M16 42 C14 32, 22 28, 30 32 C36 34, 46 32, 50 40 C52 44, 46 44, 38 44 C26 44, 18 45, 16 42 Z" fill="#FFB800"/>
+
+    <!-- Duck Head & Neck -->
+    <circle cx="22" cy="22" r="11" fill="#FFB800"/>
+
+    <!-- Duck Eye -->
+    <circle cx="19" cy="20" r="1.8" fill="#111827"/>
+    <circle cx="18.3" cy="19.3" r="0.6" fill="#FFFFFF"/>
+
+    <!-- Duck Beak -->
+    <path d="M12 21 C8 21, 6 24, 12 26 C14 26, 15 23, 12 21 Z" fill="#FF7A00"/>
+</svg>

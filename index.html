@@ -16,6 +16,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -28,7 +31,7 @@
         <!-- Header -->
         <header class="header">
             <div class="logo">
-                <i class="fa-solid fa-feather-pointed logo-icon"></i>
+                <img src="{{ url_for('static', filename='favicon.svg') }}" class="logo-img" alt="Swimming Duck Logo">
                 <span>Duck<span class="highlight">Downloader</span></span>
             </div>
             <p class="subtitle">Công cụ trực tuyến: Tải video TikTok, Facebook Không Logo & Chuyển đổi PDF sang PNG sắc nét</p>
